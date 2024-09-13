@@ -1,143 +1,102 @@
-import random
+import numpy as np
 import matplotlib.pyplot as plt
 
-"""class percepcao:
-    posicao = (int, int)
-    status = str
+class Agente:
+    def __init__(self, posicao):
+        self.posicao = posicao
 
-def agenteReativoSimples(percepcao: percepcao):
-    return percepcao.status"""
+    def perceber(self, matriz):
+        x, y = self.posicao
+        return matriz[x][y]
 
-def embaralha(matrix):
+    def agir(self, percepcao):
+        if percepcao == 2:
+            return 'aspirar'
+        else:
+            return 'mover'
 
-    # Encontrar as posições dos elementos a serem embaralhados
-    posicoes = [(i, j) for i in range(len(matrix)) for j in range(len(matrix[0])) if matrix[i][j] != 1]
+def geraCaminho(matriz):
 
-    # Criar uma lista com os valores a serem embaralhados
-    valores_embaralhar = [matrix[i][j] for i, j in posicoes]
+    linhas = len(matriz)
+    colunas = len(matriz[0])
+    caminho = []
 
-    # Embaralhar a lista de posições
-    random.shuffle(posicoes)
+    for i in range(linhas):
+        if i % 2 == 0:
+            # Linhas pares: da esquerda para a direita
+            for j in range(colunas):
+                if matriz[i][j] != 1:
+                    caminho.append((i, j))
+        else:
+            # Linhas ímpares: da direita para a esquerda
+            for j in range(colunas - 1, -1, -1):
+                if matriz[i][j] != 1:
+                    caminho.append((i, j))
 
-    # Embaralhar os valores na matriz
-    for i, (x, y) in enumerate(posicoes):
-        matrix[x][y] = valores_embaralhar[i]
+    return caminho
 
-    return matrix
+def geraMatriz(rows, cols):
+    # Initialize the array with all 0s
+    arr = np.zeros((rows, cols), dtype=int)
 
-def novaMatriz():
+    # Set the borders to 1
+    arr[0, :] = 1
+    arr[-1, :] = 1
+    arr[:, 0] = 1
+    arr[:, -1] = 1
 
-    matrix = [
-        [1, 1, 1, 1, 1, 1],
-        [1, 2, 0, 0, 0, 1],
-        [1, 2, 0, 0, 0, 1],
-        [1, 2, 0, 0, 0, 1],
-        [1, 2, 0, 0, 0, 1],
-        [1, 1, 1, 1, 1, 1],
-    ]
+    # Randomly switch some 0s to 2s
+    num_switches = int(rows * cols * 0.2)  # adjust this value to control the number of switches
+    for _ in range(num_switches):
+        row_idx = np.random.randint(1, rows - 1)
+        col_idx = np.random.randint(1, cols - 1)
+        if arr[row_idx, col_idx] == 0:
+            arr[row_idx, col_idx] = 2
 
-    return embaralha(matrix)
+    return arr
 
-def limpa(matriz, x, y):
+def exibir(matriz, posicaoInicial, inverte):
 
-    if matriz[x][y] == 2 or matriz[0][y] == 2:
-        matriz[x][y] = 0
-
-    return matriz
-
-def mapeamento(posicaoInicial: tuple, matrix, inverte):
-
-    (x, y) = posicaoInicial
-    print(posicaoInicial)
-
-    if inverte == 0:
-        if x < 4 and y % 2 != 0:
-            x += 1
-
-        if x > 1 and y % 2 == 0:
-            x -= 1
-    else:
-        if x > 1 and y % 2 != 0:
-            x -= 1
-
-        if x < 4 and y % 2 == 0:
-            x += 1
-
-    return x, y
-
-# Função que exibe o ambiente na tela
-def exibir(matrix):
-    # Altera o esquema de cores do ambiente
-
-    i = 0
-    y = 1
-
+    caminho = geraCaminho(matriz)
     plt.ion()
 
-    while i <= 5:
+    while True:
+        if inverte:
+            for posicao in reversed(caminho):
+                agente = Agente(posicao)
+                percepcao = agente.perceber(matriz)
+                acao = agente.agir(percepcao)
 
-        #plt.pause(0.3)
+                plt.imshow(matriz)
+                plt.nipy_spectral()
+                plt.plot(posicao[1], posicao[0], 'ro')  # Plotar o agente
+                plt.pause(0.2)
+                plt.clf()
 
-        if i == 1 and y == 4:
-            inverte = 1
-            print('inverso')
-            matrix = novaMatriz()
+                if acao == 'aspirar':
+                    matriz[posicao] = 0
 
-        if i == 1 and y == 1:
-
-            print('normal')
-            inverte = 0
-
-        if i == 0 and y == 1:
-            print('normal')
-            inverte = 0
-            matrix = novaMatriz()
-
-        proximaCasa, y = mapeamento((i,y), matrix, inverte)
-
-        if inverte == 0:
-            # Coloca o agente no ambiente
-
-            if y%2 != 0:
-                if i == 4:
-                    y += 1
-                if y % 2 != 0:
-                    i += 1
-
-            if y%2 == 0:
-                if i == 1:
-                    y += 1
-                if y % 2 == 0 and proximaCasa < i:
-                    i -= 1
+            exibir(geraMatriz(altura, largura), posicao, False)
 
         else:
-            if y%2 == 0:
-                if i == 4:
-                    y -= 1
-                if y % 2 == 0:
-                    i += 1
+            for posicao in caminho:
+                agente = Agente(posicao)
+                percepcao = agente.perceber(matriz)
+                acao = agente.agir(percepcao)
 
-            if y%2 != 0:
-                if i == 1:
-                    y -= 1
-                if y % 2 != 0 and proximaCasa < i:
-                    i -= 1
+                plt.imshow(matriz)
+                plt.nipy_spectral()
+                plt.plot(posicao[1], posicao[0], 'ro')  # Plotar o agente
+                plt.pause(0.2)
+                plt.clf()
 
-        matrix = limpa(matrix, y, i)
+                if acao == 'aspirar':
+                    matriz[posicao] = 0
 
-        plt.imshow(matrix)
-        plt.nipy_spectral()
+            exibir(geraMatriz(altura, largura), posicao, True)
 
-        plt.plot([proximaCasa], [y], marker='o', color='r', ls='')
-
-        plt.draw()
-        plt.pause(0.4)
-        plt.clf()
-
-        #if y == 6:
-            #plt.pause(1)
-            #mapeamento((proximaCasa, y))
-
-# Press the green button in the gutter to run the script.
 if __name__ == '__main__':
-    exibir(novaMatriz())
+    altura, largura = 7, 7
+    matriz = geraMatriz(altura, largura)
+    posicaoInicial = (3, 5)
+    exibir(matriz, posicaoInicial, False)
