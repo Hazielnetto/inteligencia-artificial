@@ -1,5 +1,7 @@
+from random import randint
 import numpy as np
 import matplotlib.pyplot as plt
+from collections import deque
 
 
 class Agente:
@@ -17,110 +19,168 @@ class Agente:
             return 'mover'
 
 
-def geraCaminho( matriz ):
-    linhas = len( matriz )
-    colunas = len( matriz[0] )
-    caminho = []
+def encontrarPosicoesDosDois( array ):
+    posicoes = []
+    for i in range( len( array ) ):
+        for j in range( len( array[0] ) ):
+            if array[i][j] == 2:
+                posicoes.append( (i, j) )
+    return posicoes
 
-    for i in range( linhas ):
-        if i % 2 == 0:
-            # Linhas pares: da esquerda para a direita
-            for j in range( colunas ):
-                if matriz[i][j] != 1:
-                    caminho.append( (i, j) )
+
+def posicaoValida( x, y, array, visitado ):
+    if 0 <= x < len( array ) and 0 <= y < len( array[0] ) and not visitado[x][y]:
+        return True
+    return False
+
+
+# Busca em Largura (BFS) para encontrar o menor caminho para um alvo
+def bfs( array, inicio, alvo ):
+    filas = deque( [(*inicio, [])] )  # Fila contendo a posição atual e o caminho percorrido
+    visitado = [[False for _ in range( len( array[0] ) )] for _ in range( len( array ) )]
+    visitado[inicio[0]][inicio[1]] = True
+
+    direcoes = [(-1, 0), (1, 0), (0, -1), (0, 1)]  # Cima, Baixo, Esquerda, Direita
+
+    while filas:
+        x, y, caminho = filas.popleft()
+
+        # Se encontrou o alvo (2)
+        if (x, y) == alvo:
+            return caminho + [(x, y)]
+
+        # Explorar as direções
+        for dx, dy in direcoes:
+            nx, ny = x + dx, y + dy
+            if posicaoValida( nx, ny, array, visitado ):
+                visitado[nx][ny] = True
+                filas.append( (nx, ny, caminho + [(nx, ny)]) )
+
+    return []  # Caso não seja possível chegar ao alvo
+
+
+def adicionarCaminho( caminho, posicaoAtual, proximoPasso ):
+    xAtual, yAtual = posicaoAtual
+    xProximo, yProximo = proximoPasso
+
+    # Movimento na direção x
+    while xAtual != xProximo:
+        if xAtual < xProximo:
+            xAtual += 1
         else:
-            # Linhas ímpares: da direita para a esquerda
-            for j in range( colunas - 1, -1, -1 ):
-                if matriz[i][j] != 1:
-                    caminho.append( (i, j) )
+            xAtual -= 1
+        caminho.append( (xAtual, yAtual) )
 
-    return caminho
-
-
-def geraMatriz( rows, cols ):
-    # Initialize the array with all 0s
-    arr = np.zeros( (rows, cols), dtype=int )
-
-    # Set the borders to 1
-    arr[0, :] = 1
-    arr[-1, :] = 1
-    arr[:, 0] = 1
-    arr[:, -1] = 1
-
-    # Randomly switch some 0s to 2s
-    num_switches = int( rows * cols * 0.2 )  # adjust this value to control the number of switches
-    for _ in range( num_switches ):
-        row_idx = np.random.randint( 1, rows - 1 )
-        col_idx = np.random.randint( 1, cols - 1 )
-        if arr[row_idx, col_idx] == 0:
-            arr[row_idx, col_idx] = 2
-
-    return arr
+    # Movimento na direção y
+    while yAtual != yProximo:
+        if yAtual < yProximo:
+            yAtual += 1
+        else:
+            yAtual -= 1
+        caminho.append( (xAtual, yAtual) )
 
 
-def plota( posicao ):
+def gerarCaminho( array, inicio ):
+    totalMovimentos = 0
+    caminho = []
+    posicoesDosDois = encontrarPosicoesDosDois( array )
+    posicaoAtual = inicio
+    caminho.append( posicaoAtual )  # Adiciona a posição inicial ao caminho
+
+    while posicoesDosDois:
+        distancias = []
+        caminhosBfs = []
+        for alvo in posicoesDosDois:
+            caminhoParaAlvo = bfs( array, posicaoAtual, alvo )
+            distancias.append( (len( caminhoParaAlvo ), alvo) )
+            caminhosBfs.append( caminhoParaAlvo )
+
+        # Escolhe o alvo mais próximo
+        menorDistancia, alvoMaisProximo = min( distancias )
+        indiceDoCaminho = distancias.index( (menorDistancia, alvoMaisProximo) )
+
+        # Adiciona o caminho até o alvo mais próximo célula por célula
+        for proximoPasso in caminhosBfs[indiceDoCaminho][1:]:
+            adicionarCaminho( caminho, posicaoAtual, proximoPasso )
+            posicaoAtual = proximoPasso
+
+        totalMovimentos += menorDistancia
+
+        # Remove o alvo da lista
+        posicoesDosDois.remove( alvoMaisProximo )
+
+    return totalMovimentos, caminho
+
+
+def gerarMatriz( rows, cols, incidencia ):
+    # Inicializa a matriz com todos os valores em 0
+    matriz = np.zeros( (rows, cols), dtype=int )
+
+    # Define as bordas como 1
+    matriz[0, :] = 1
+    matriz[-1, :] = 1
+    matriz[:, 0] = 1
+    matriz[:, -1] = 1
+
+    # Troca aleatoriamente alguns 0s por 2s
+    numSwitches = int( rows * cols * incidencia )
+    for _ in range( numSwitches ):
+        rowIdx = np.random.randint( 1, rows - 1 )
+        colIdx = np.random.randint( 1, cols - 1 )
+        if matriz[rowIdx, colIdx] == 0:
+            matriz[rowIdx, colIdx] = 2
+
+    return matriz
+
+
+def plotar( posicao ):
     plt.imshow( matriz )
     plt.nipy_spectral()
     plt.plot( posicao[1], posicao[0], 'ro' )  # Plotar o agente
-    plt.pause( 0.4 )
+    plt.pause( delay )
     plt.clf()
 
 
-def limpa( posicao ):
+def limpar( posicao ):
     matriz[posicao] = 0
 
 
-def inicia( matriz, posicaoInicial ):
-    caminho = geraCaminho( matriz )
-    plt.ion()
+def checarObjetivo( matriz ):
+    return 'limpo' if 2 not in matriz else 'sujo'
 
+
+def iniciar( matriz, posicaoInicial ):
+    movimentos, caminho = gerarCaminho( matriz, posicaoInicial )
+    pontos = 0
+    plt.ion()
     i = 0
     while True:
+        objetivo = checarObjetivo( matriz )
         posicao = caminho[i]
 
         agente = Agente( posicao )
         percepcao = agente.perceber( matriz )
         acao = agente.acao( percepcao )
 
-        plota( posicao )
-
-        if acao == 'aspirar':
-            limpa( posicao )
+        plotar( posicao )
+        if objetivo != 'limpo':
+            if acao == 'aspirar':
+                limpar( posicao )
+            else:
+                i += 1
+            # pontos += 1
         else:
-            i += 1
+            break
 
-    """while True:
-        if inverte:
-            for posicao in reversed(caminho):
-                if agente.agir != 'aspirar':
-                    agente = Agente(posicao)
-                    percepcao = agente.perceber(matriz)
-                    acao = agente.agir(percepcao)
-                    plota(posicao)
-
-                else:
-                    matriz[posicao] = 0
-                    plota(posicao)                   
-
-            inicia(matriz, posicao, False)
-
-        else:
-            for posicao in caminho:
-                if agente.agir != 'aspirar':
-                    agente = Agente(posicao)
-                    percepcao = agente.perceber(matriz)
-                    acao = agente.agir(percepcao)
-                    plota(posicao)
-
-                else:
-                    matriz[posicao] = 0
-                    plota(posicao)
-
-            inicia(matriz, posicao, True)"""
+    print( f"Total de movimentos/pontos: {movimentos}" )
+    # print( f"Total de pontos: {pontos}" )
+    print( f"Caminho do agente: {caminho}" )
 
 
 if __name__ == '__main__':
-    altura, largura = 7, 7
-    matriz = geraMatriz( altura, largura )
-    posicaoInicial = (3, 5)
-    inicia( matriz, posicaoInicial )
+    altura, largura = 6, 6
+    delay = 0.3
+    incidencia = 1  # Ajuste esse valor para controlar a quantidade de "2s"
+    matriz = gerarMatriz( altura, largura, incidencia )
+    posicaoInicial = (randint( 1, altura - 2 ), randint( 1, largura - 2 ))  # Inicializa o agente numa posição aleatória
+    iniciar( matriz, posicaoInicial )
