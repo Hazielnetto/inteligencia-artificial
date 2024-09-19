@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import random
 
 class Agente:
     def __init__(self, posicao):
@@ -7,96 +8,109 @@ class Agente:
 
     def perceber(self, matriz):
         x, y = self.posicao
-        return matriz[x][y]
-
-    def agir(self, percepcao):
-        if percepcao == 2:
-            return 'aspirar'
+        if matriz[x][y] == 2:  # Sujo
+            return (self.posicao, 'sujo')
         else:
-            return 'mover'
+            return (self.posicao, 'limpo')
 
-def geraCaminho(matriz):
+def agenteReativoSimples(percepcao, voltar):
+    posicao, status = percepcao
+    x, y = posicao
 
-    linhas = len(matriz)
-    colunas = len(matriz[0])
-    caminho = []
-
-    for i in range(linhas):
-        if i % 2 == 0:
-            # Linhas pares: da esquerda para a direita
-            for j in range(colunas):
-                if matriz[i][j] != 1:
-                    caminho.append((i, j))
+    if status == 'sujo':
+        return 'aspirar'
+    else:
+        if not voltar:
+            if x % 2 == 1:
+                if y < 4:
+                    return 'direita'
+                else:
+                    return 'abaixo' if x < 5 else None
+            else:
+                if y > 1:
+                    return 'esquerda'
+                else:
+                    return 'abaixo' if x < 5 else None
         else:
-            # Linhas ímpares: da direita para a esquerda
-            for j in range(colunas - 1, -1, -1):
-                if matriz[i][j] != 1:
-                    caminho.append((i, j))
+            if x % 2 == 1:
+                if y > 1:
+                    return 'esquerda'
+                else:
+                    return 'acima' if x > 1 else None
+            else:
+                if y < 4:
+                    return 'direita'
+                else:
+                    return 'acima' if x > 1 else None
 
-    return caminho
+def gerarMatriz( rows, cols, incidencia ):
+    matriz = np.zeros( (rows, cols), dtype=int )
 
-def geraMatriz(rows, cols):
-    # Initialize the array with all 0s
-    arr = np.zeros((rows, cols), dtype=int)
+    matriz[0, :] = 1
+    matriz[-1, :] = 1
+    matriz[:, 0] = 1
+    matriz[:, -1] = 1
 
-    # Set the borders to 1
-    arr[0, :] = 1
-    arr[-1, :] = 1
-    arr[:, 0] = 1
-    arr[:, -1] = 1
+    numSwitches = int( rows * cols * incidencia )
+    for _ in range( numSwitches ):
+        rowIdx = np.random.randint( 1, rows - 1 )
+        colIdx = np.random.randint( 1, cols - 1 )
+        if matriz[rowIdx, colIdx] == 0:
+            matriz[rowIdx, colIdx] = 2
 
-    # Randomly switch some 0s to 2s
-    num_switches = int(rows * cols * 0.2)  # adjust this value to control the number of switches
-    for _ in range(num_switches):
-        row_idx = np.random.randint(1, rows - 1)
-        col_idx = np.random.randint(1, cols - 1)
-        if arr[row_idx, col_idx] == 0:
-            arr[row_idx, col_idx] = 2
+    return matriz
 
-    return arr
+def plotar(posicao, matriz):
+    plt.imshow(matriz, 'gray')    
+    plt.nipy_spectral()
+    plt.plot(posicao[1], posicao[0], 'ro')
+    plt.show(block=False)
+    plt.pause(0.4)
+    plt.clf()
 
-def exibir(matriz, posicaoInicial, inverte):
+def limpa(posicao, matriz):
+    matriz[posicao] = 0
 
-    caminho = geraCaminho(matriz)
+def mover(posicao, acao):
+    x, y = posicao
+    if acao == 'acima':
+        return (x - 1, y)
+    elif acao == 'abaixo':
+        return (x + 1, y)
+    elif acao == 'esquerda':
+        return (x, y - 1)
+    elif acao == 'direita':
+        return (x, y + 1)
+    return posicao
+
+def iniciar(matriz, posicaoInicial):
+    posicao = posicaoInicial
+    voltar = False
     plt.ion()
 
     while True:
-        if inverte:
-            for posicao in reversed(caminho):
-                agente = Agente(posicao)
-                percepcao = agente.perceber(matriz)
-                acao = agente.agir(percepcao)
+        agente = Agente(posicao)
+        percepcao = agente.perceber(matriz)
+        acao = agenteReativoSimples(percepcao, voltar)
 
-                plt.imshow(matriz)
-                plt.nipy_spectral()
-                plt.plot(posicao[1], posicao[0], 'ro')  # Plotar o agente
-                plt.pause(0.2)
-                plt.clf()
+        plotar(posicao, matriz)
 
-                if acao == 'aspirar':
-                    matriz[posicao] = 0
-
-            exibir(geraMatriz(altura, largura), posicao, False)
-
+        if acao == 'aspirar':
+            limpa(posicao, matriz)
         else:
-            for posicao in caminho:
-                agente = Agente(posicao)
-                percepcao = agente.perceber(matriz)
-                acao = agente.agir(percepcao)
+            novaPosicao = mover(posicao, acao)
 
-                plt.imshow(matriz)
-                plt.nipy_spectral()
-                plt.plot(posicao[1], posicao[0], 'ro')  # Plotar o agente
-                plt.pause(0.2)
-                plt.clf()
+            if matriz[novaPosicao] != 1:
+                posicao = novaPosicao
 
-                if acao == 'aspirar':
-                    matriz[posicao] = 0
-
-            exibir(geraMatriz(altura, largura), posicao, True)
+        if posicao == (4, 1) and not voltar:
+            voltar = True
+        elif posicao == (1, 1) and voltar:
+            voltar = False
 
 if __name__ == '__main__':
-    altura, largura = 7, 7
-    matriz = geraMatriz(altura, largura)
-    posicaoInicial = (3, 5)
-    exibir(matriz, posicaoInicial, False)
+    altura, largura = 6, 6
+    incidencia = 0.3
+    matriz = gerarMatriz(altura, largura, incidencia)
+    posicaoInicial = (1, 1)
+    iniciar(matriz, posicaoInicial)
